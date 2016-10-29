@@ -3,7 +3,6 @@ function Matrix(r,c,v){
 
   this.matrix = []
   this.isMatrix = true
-  this.keys = {}
 
   for(var y = 0; y < r; y++){
     this.matrix[y] = []
@@ -18,7 +17,13 @@ Matrix.prototype = {
   iterate: function(f){
     for(var y = 0; y < this.matrix.length; y++)
       for(var x = 0; x < this.matrix[y].length; x++)
-        f(this.matrix[y][x],y,x)
+        this.matrix[y][x] = f(this.matrix[y][x],y,x) || this.matrix[y][x]
+  },
+
+  safeIterate: function(f){
+    for(var y in this.matrix)
+      for(var x in this.matrix[y])
+        f(this.matrix[y][x],parseInt(y),parseInt(x))
   },
 
   iterateRow: function(y,f){
@@ -31,33 +36,9 @@ Matrix.prototype = {
       f(this.matrix[y][x],y,x)
   },
 
-  key: function(k){
-    return this.matrix[this.keys[k]][this.keys[k]]
-  },
-
-  keyRow: function(k){
-    return this.matrix[this.keys[k]]
-  },
-
-  keyCol: function(y,k){
-    return this.matrix[y][this.keys[k]]
-  },
-
-  keyAssign: function(k,yx){
-    this.keys[k] = yx
-  },
-
-  keyInsert: function(k,v){
-    this.addRowCol(v)
-    this.keyAssign(k,this.root()-1)
-  },
-
-  keyRemove: function(k){
-    this.removeRowCol(this.keys[k])
-    delete this.keys[k]
-  },
-
   get: function(y,x,wrap){
+    if(x == null)
+      return this.getRow(y)
     if(y >= this.root() && wrap)
       y = 0
     if(y < 0 && wrap)
@@ -72,6 +53,14 @@ Matrix.prototype = {
   },
 
   set: function(y,x,v){
+    if(this.matrix[y] != null)
+      if(this.matrix[y][x] != null)
+        this.matrix[y][x] = v
+  },
+
+  insert: function(y,x,v){
+    if(!this.matrix[y])
+      this.matrix[y] = []
     this.matrix[y][x] = v
   },
 
@@ -118,6 +107,10 @@ Matrix.prototype = {
   addRowCol: function(v){
     this.addRow(v)
     this.addCol(v)
+  },
+
+  remove: function(y,x){
+    delete this.matrix[y][x]
   },
 
   removeRow: function(y){
@@ -231,7 +224,17 @@ Matrix.prototype = {
     })
   },
 
-  isEmpty: function(){
+  isInbounds: function(y,x){
+    if(this.matrix[y] == null)
+      return false
+    if(this.matrix[y][x] == null)
+      return false
+    return true
+  },
+
+  isEmpty: function(y,x){
+    if(y != null && x != null)
+      return !this.isInbounds(y,x)
     return this.reduce() ? true : false
   },
 
@@ -308,19 +311,38 @@ Matrix.prototype.iterateNeighbours = function(y,x,f){
     f(n[i],y,x)
 }
 
+Matrix.prototype.iterateNeighbourhood = function(y,x,d,f){
+  y -= 1, x -= 1
+  var rounds = 0
+  var dist = 2
+  for(var i = 0; rounds < d; i+=dist*4){
+    for(var n = 0; n < dist; n++)
+      f(this.get(y,x,true),y,x++)
+    for(var n = 0; n < dist; n++)
+      f(this.get(y,x,true),y++,x)
+    for(var n = 0; n < dist; n++)
+      f(this.get(y,x,true),y,x--)
+    for(var n = 0; n < dist; n++)
+      f(this.get(y,x,true),y--,x)
+    y -= 1, x -= 1
+    dist += 2
+    rounds++
+  }
+}
+
 Matrix.prototype.randomNeighbour = function(){
   return this.getNeighbour(Math.floor(Math.random() * 8))
 }
 
-Matrix.prototype.traverse_forward = this.iterate
+Matrix.prototype.traverseForward = this.iterate
 
-Matrix.prototype.traverse_backward = function(f){
+Matrix.prototype.traverseBackward = function(f){
   for(var y = this.matrix.length-1; y >= 0; y--)
     for(var x = this.matrix[y].length; x >= 0; x--)
       f(this.get(y,x),y,x)
 }
 
-Matrix.prototype.traverse_random = function(f,n){
+Matrix.prototype.traverseRandom = function(f,n){
   for(var i = 0; i < (n || this.size()); i++){
     var y = Math.floor(Math.random() * this.root())
     var x = Math.floor(Math.random() * this.root())
@@ -328,7 +350,7 @@ Matrix.prototype.traverse_random = function(f,n){
   }
 }
 
-Matrix.prototype.traverse_neighbourhood = function(f){
+Matrix.prototype.traverseNeighboursAll = function(f){
   this.iterate(function(i,y,x){
     this.iterateNeighbours(y,x,f)
   }.bind(this))
